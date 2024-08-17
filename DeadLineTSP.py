@@ -57,7 +57,10 @@ for i in range(numVertices):
 resolucao = dl_tsp.solve()
 print(f"Status do problema: {LpStatus[resolucao]}")
 
-#Variaveis
+#Mostra as variaveis
 for var in dl_tsp.variables():
     if var.varValue > 0:
         print(f"{var.name} = {var.varValue}")
+
+#Mostra a funcao objetivo
+print(f"Tempo total de percuso = {value(dl_tsp.objective)}")
