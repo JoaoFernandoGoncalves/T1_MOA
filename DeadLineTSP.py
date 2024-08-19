@@ -48,7 +48,7 @@ M = [[max(prazos[i] + custos[i][j], 0) for j in range(numVertices)] for i in ran
 #M = 100000
 
 for (i, j) in arestas:
-    if i > 0:
+    if j > 0:
         dl_tsp += t[i] + custos[i][j] - t[j] <= M[i][j] * (1 - x[i, j])
 
 #Restricao de prazo
@@ -67,3 +67,5 @@ for var in dl_tsp.variables():
 
 #Mostra a funcao objetivo
 print(f"Tempo total de percuso = {value(dl_tsp.objective)}")
+
+dl_tsp.writeLP("CaxeiroViajante.txt")
