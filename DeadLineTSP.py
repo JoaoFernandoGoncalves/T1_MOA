@@ -1,6 +1,7 @@
 import glob
 import numpy as np
 from pulp import *
+import time
 
 nomeInstancias = glob.glob('Instancias\*.txt')
 
@@ -8,7 +9,7 @@ def leituraInstancia(nomeInstancia):
     arqv = open(nomeInstancia, "r")
 
     numVertices = int(arqv.readline())
-    matrizCustos = np.empty((21,21), dtype=int)
+    matrizCustos = np.empty((numVertices, numVertices), dtype=int)
     
     for i in range (numVertices):
         linha = list(map(int, arqv.readline().split()))
@@ -22,50 +23,77 @@ def leituraInstancia(nomeInstancia):
 
     return numVertices, matrizCustos, arestas, prazos
 
-numVertices, custos, arestas, prazos = leituraInstancia(nomeInstancias[0])
+def main():
+    arqv = open("testes.txt", "w")
+    tempoLimite = 2
 
-#print(f"\n\nResolução do Caixeiro Viajante com Prazos para a instancia: {nome}\n\n")
+    for instancia in nomeInstancias:
+        numVertices, custos, arestas, prazos = leituraInstancia(instancia)
 
-#Inicializando o LP
-dl_tsp = LpProblem("Caxeiro_Viajante_com_Prazos", LpMinimize)
+        print(f"\n\nResolucao do Caixeiro Viajante com Prazos para a instancia: {instancia}")
+        arqv.write(f"\n\nResolucao do Caixeiro Viajante com Prazos para a instancia: {instancia}\n")
 
-#Variaveis de decisao
-x = LpVariable.dicts("x", arestas, cat = "Binary")
-t = LpVariable.dicts("t", [i for i in range(numVertices)], lowBound = 0, upBound = None, cat = "Integer")
+        #Inicializando o LP
+        dl_tsp = LpProblem("Caxeiro_Viajante_com_Prazos", LpMinimize)
 
-#Funcao objetivo
-dl_tsp += lpSum([custos[i][j] * x[i, j] for (i, j) in arestas])
+        #Variaveis de decisao
+        x = LpVariable.dicts("x", arestas, cat = "Binary")
+        t = LpVariable.dicts("t", [i for i in range(numVertices)], lowBound = 0, upBound = None, cat = "Integer")
 
-#Restricoes de fluxo de entrada e saida dos vertices
-for j in range(numVertices):
-    dl_tsp += lpSum([x[i, j] for (i, u) in arestas if u == j]) == 1
+        #Funcao objetivo
+        dl_tsp += lpSum([custos[i][j] * x[i, j] for (i, j) in arestas])
 
-for i in range(numVertices):
-    dl_tsp += lpSum([x[i, j] for (u, j) in arestas if u == i]) == 1
+        #Restricoes de fluxo de entrada e saida dos vertices
+        for j in range(numVertices):
+            dl_tsp += lpSum([x[i, j] for (i, u) in arestas if u == j]) == 1
 
-#Restricao de eliminação de subrotas
-M = [[max(prazos[i] + custos[i][j], 0) for j in range(numVertices)] for i in range(numVertices)]
-#M = 100000
+        for i in range(numVertices):
+            dl_tsp += lpSum([x[i, j] for (u, j) in arestas if u == i]) == 1
 
-for (i, j) in arestas:
-    if j > 0:
-        dl_tsp += t[i] + custos[i][j] - t[j] <= M[i][j] * (1 - x[i, j])
+        #Restricao de eliminação de subrotas
+        M = [[max(prazos[i] + custos[i][j], 0) for j in range(numVertices)] for i in range(numVertices)]
+        #M = 100000
 
-#Restricao de prazo
-for i in range(numVertices):
-    if prazos[i] > 0:
-        dl_tsp += t[i] <= prazos[i]
+        for (i, j) in arestas:
+            if j > 0:
+                dl_tsp += t[i] + custos[i][j] - t[j] <= M[i][j] * (1 - x[i, j])
 
-#Resolvendo
-resolucao = dl_tsp.solve()
-print(f"Status do problema: {LpStatus[resolucao]}")
+        #Restricao de prazo
+        for i in range(numVertices):
+            if prazos[i] > 0:
+                dl_tsp += t[i] <= prazos[i]
+        
+        #Resolvendo 
+        resolucao = dl_tsp.solve(PULP_CBC_CMD(timeLimit=1200, msg=False))
+        
+        if LpStatus[resolucao] == "Optimal":
+            print(f"Status do problema: {LpStatus[resolucao]}")
+            arqv.write(f"Status do problema: {LpStatus[resolucao]}\n")
 
-#Mostra as variaveis
-for var in dl_tsp.variables():
-    if var.varValue > 0:
-        print(f"{var.name} = {var.varValue}")
+            for var in dl_tsp.variables():
+                if var.varValue > 0:
+                    print(f"{var.name} = {var.varValue}")
+                    arqv.write(f"{var.name} = {var.varValue}\n")
 
-#Mostra a funcao objetivo
-print(f"Tempo total de percuso = {value(dl_tsp.objective)}")
+            print(f"Tempo total de percurso = {value(dl_tsp.objective)}")
+            arqv.write(f"Tempo total de percurso = {value(dl_tsp.objective)}\n")
+        elif LpStatus[resolucao] == "Not Solved":
+            print("Nenhuma solucao foi encontrada dentro do tempo limite de 20min.")
+            arqv.write("Nenhuma solucao foi encontrada dentro do tempo limite de 20min.\n")
 
-dl_tsp.writeLP("CaxeiroViajante.txt")
+            print(f"Status do problema: {LpStatus[resolucao]}")
+            arqv.write(f"Status do problema: {LpStatus[resolucao]}\n")
+
+            for var in dl_tsp.variables():
+                if var.varValue > 0:
+                    print(f"{var.name} = {var.varValue}")
+                    arqv.write(f"{var.name} = {var.varValue}\n")
+
+            print(f"Tempo total de percurso = {value(dl_tsp.objective)}")
+            arqv.write(f"Tempo total de percurso = {value(dl_tsp.objective)}\n")
+        else:
+            print("Nenhuma solucaoo foi encontrada.")
+            arqv.write("Nenhuma solucao foi encontrada.\n")
+
+
+main()
