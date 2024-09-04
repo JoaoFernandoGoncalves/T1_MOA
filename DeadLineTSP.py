@@ -3,7 +3,7 @@ import numpy as np
 from pulp import *
 import time
 
-nomeInstancias = glob.glob('Instancias\*.txt')
+nomeInstancias = glob.glob('NovasInstancias\*.txt')
 
 def leituraInstancia(nomeInstancia):
     arqv = open(nomeInstancia, "r")
@@ -24,7 +24,7 @@ def leituraInstancia(nomeInstancia):
     return numVertices, matrizCustos, arestas, prazos
 
 def main():
-    arqv = open("testes.txt", "w")
+    arqv = open("EXDeadlineTSP_testes.txt", "w")
     tempoLimite = 2
 
     for instancia in nomeInstancias:

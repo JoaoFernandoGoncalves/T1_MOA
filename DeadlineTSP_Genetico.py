@@ -9,7 +9,7 @@ import time
 
 from DecoderTSP import TSPDecoder
 
-nomeInstancias = glob.glob('Instancias/*.txt')
+nomeInstancias = glob.glob("NovasInstancias/*.txt")
 
 def leituraInstancia(nomeInstancia):
     arqv = open(nomeInstancia, "r")
@@ -88,6 +88,8 @@ def main():
             if current_best_cost < best_cost:
                 best_cost = current_best_cost
                 iter_without_improvement = 0  # Reset contador se houve melhora
+
+                found_cost = time.time() - start_time
             else:
                 iter_without_improvement += 1
 
@@ -115,6 +117,9 @@ def main():
         best_permutation = sorted(range(len(best_chromosome)), key=lambda k: best_chromosome[k])
         print(f"Melhor rota: {best_permutation}")
         arqv.write(f"Melhor rota: {best_permutation}\n")
+
+        print(f"Tempo de execução até encontrar o melhor custo: {found_cost}")
+        arqv.write(f"Tempo de execução até encontrar o melhor custo: {found_cost}")
 
     arqv.close()
 
