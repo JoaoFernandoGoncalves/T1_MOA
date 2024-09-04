@@ -1,11 +1,15 @@
 import glob
+from random import random, seed
+import sys
 import numpy as np
 from brkga_mp_ipr.enums import Sense
 from brkga_mp_ipr.algorithm import BrkgaMpIpr
 from brkga_mp_ipr.types_io import load_configuration
-from brkga_mp_ipr.types import BaseChromosome
+import time
 
-nomeInstancias = glob.glob('Instancias/000_teste.txt')
+from DecoderTSP import TSPDecoder
+
+nomeInstancias = glob.glob('Instancias/*.txt')
 
 def leituraInstancia(nomeInstancia):
     arqv = open(nomeInstancia, "r")
@@ -17,7 +21,7 @@ def leituraInstancia(nomeInstancia):
         linha = list(map(int, arqv.readline().split()))
         for j in range(numVertices):
             matrizCustos[i][j] = linha[j]
-    
+            # print("leitura", i,",", j, matrizCustos)
     arqv.readline()  # Linha vazia entre a matriz e os prazos
     prazos = list(map(int, arqv.readline().split()))
 
@@ -26,67 +30,26 @@ def leituraInstancia(nomeInstancia):
     return numVertices, matrizCustos, arestas, prazos
 
 
-class TSPDeadlineDecoder:
-    def __init__(self, numVertices, matrizCustos, prazos):
-        self.numVertices = numVertices
-        self.matrizCustos = matrizCustos
-        self.prazos = prazos
-        self.M = [[max(prazos[i] + matrizCustos[i][j], 0) for j in range(numVertices)] for i in range(numVertices)]
 
-    def decode(self, chromosome: BaseChromosome, rewrite: bool = False) -> float:
-        permutation = [0] + sorted(range(1, len(chromosome)), key=lambda k: chromosome[k]) + [0]
-        
-        total_cost = 0
-        time_elapsed = 0
-        t = [0] * self.numVertices  # Tempos de chegada
-        x = np.zeros((self.numVertices, self.numVertices))  # Variáveis de decisão
 
-        # Implementando restrições de fluxo de entrada e saída dos vértices
-        for j in range(self.numVertices):
-            incoming = sum([x[i][j] for i in range(self.numVertices) if self.matrizCustos[i][j] > 0])
-            if incoming != 1:
-                return float('inf')
-
-        for i in range(self.numVertices):
-            outgoing = sum([x[i][j] for j in range(self.numVertices) if self.matrizCustos[i][j] > 0])
-            if outgoing != 1:
-                return float('inf')
-
-        # Percorrendo a permutação para calcular custos e verificar restrições
-        for k in range(len(permutation) - 1):
-            u = permutation[k]
-            v = permutation[k + 1]
-
-            # Verifica se a aresta existe
-            if self.matrizCustos[u][v] <= 0:
-                return float('inf')
-
-            x[u][v] = 1  # Atualiza a variável de decisão para a aresta utilizada
-            time_elapsed += self.matrizCustos[u][v]
-            t[v] = time_elapsed
-
-            # Respeitar as restrições de prazo
-            if t[v] > self.prazos[v]:
-                return float('inf')
-
-            # Eliminação de subrotas
-            if u != 0 and v != 0:
-                if t[u] + self.matrizCustos[u][v] - t[v] > self.M[u][v] * (1 - x[u][v]):
-                    return float('inf')
-
-            total_cost += self.matrizCustos[u][v]
-
-        # Verificar se todos os vértices foram visitados
-        for i in range(self.numVertices):
-            if sum([x[i][j] for j in range(self.numVertices)]) != 1:
-                return float('inf')
-            if sum([x[j][i] for j in range(self.numVertices)]) != 1:
-                return float('inf')
-
-        return total_cost
+class StopRule:
+    GENERATIONS = 0
+    TARGET = 1
+    IMPROVEMENT = 2
 
 def main():
     arqv = open("testes.txt", "w")
+    if len(sys.argv) < 3:
+        print("Usage: python main_minimal.py <seed> <num_generations> ")
+        sys.exit(1)
+
+    ########################################
+    # Read the command-line arguments and the instance
+    ########################################
+
+    seed = int(sys.argv[1])
+    num_generations  = int(sys.argv[2])
+    stop_rule = StopRule.GENERATIONS  
 
     for instancia in nomeInstancias:
         numVertices, custos, arestas, prazos = leituraInstancia(instancia)
@@ -94,34 +57,61 @@ def main():
         print(f"\n\nResolução do Caixeiro Viajante com Prazos para a instância: {instancia}")
         arqv.write(f"\n\nResolução do Caixeiro Viajante com Prazos para a instância: {instancia}\n")
 
-        # Criar o decodificador
-        decoder = TSPDeadlineDecoder(numVertices, custos, prazos)
+    
+        decoder = TSPDecoder(numVertices, custos, prazos,arestas)
 
-        # Carregar a configuração do BRKGA
         brkga_params, _ = load_configuration("config.conf")
 
-        # Configuração do BRKGA
         brkga = BrkgaMpIpr(
             decoder=decoder,
             sense=Sense.MINIMIZE,
-            seed=1234,  # Semente para o gerador de números aleatórios
+            seed=  seed,  
             chromosome_size=numVertices,
             params=brkga_params
         )
 
         brkga.initialize()
 
-        # Evolução do BRKGA por um número fixo de gerações
-        num_generations = 100
-        brkga.evolve(num_generations)
+        iter_without_improvement = 0
+        best_cost = float('inf')
+        target_cost = 0 
 
-        best_cost = brkga.get_best_fitness()
-        best_chromosome = brkga.get_best_chromosome()
+  
+        start_time = time.time()
+        maximum_time = 600  
+        stop_argument = 50  # Número de iterações sem melhora
+
+        for iteration in range(num_generations):
+            brkga.evolve(1)
+            current_best_cost = brkga.get_best_fitness()
+
+            if current_best_cost < best_cost:
+                best_cost = current_best_cost
+                iter_without_improvement = 0  # Reset contador se houve melhora
+            else:
+                iter_without_improvement += 1
+
+            print(f"Iteração {iteration}: {iter_without_improvement} iterações sem melhoria")
+
+            # Verificar se atende a algum critério de parada
+            if time.time() - start_time > maximum_time:
+                print("Critério de tempo atingido. Parando a execução.")
+                break  # Critério de tempo
+
+            if stop_rule == StopRule.IMPROVEMENT or iter_without_improvement >= stop_argument: #devia ser um and ao inves de um or
+                print(f"Critério de {stop_argument} iterações sem melhoria atingido. Parando a execução.")
+                break  # Critério de iterações sem melhoria
+
+            if stop_rule == StopRule.TARGET or best_cost <= target_cost:#devia ser um and ao inves de um or
+                print(f"Critério de atingir o custo alvo {target_cost} atingido. Parando a execução.")
+                break  # Critério de atingir o custo alvo
+
 
         print(f"Melhor custo encontrado: {best_cost}")
         arqv.write(f"Melhor custo encontrado: {best_cost}\n")
         
         # Mostrar a melhor rota encontrada
+        best_chromosome = brkga.get_best_chromosome()
         best_permutation = sorted(range(len(best_chromosome)), key=lambda k: best_chromosome[k])
         print(f"Melhor rota: {best_permutation}")
         arqv.write(f"Melhor rota: {best_permutation}\n")
