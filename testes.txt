@@ -1,5 +1,13 @@
 
 
-Resolução do Caixeiro Viajante com Prazos para a instância: Instancias/000_teste.txt
+Resolução do Caixeiro Viajante com Prazos para a instância: Instancias\0001_teste1.txt
 Melhor custo encontrado: inf
-Melhor rota: [0, 2, 3, 4, 1]
+Melhor rota: [4, 3, 5, 1, 0, 2, 6]
+
+
+Resolução do Caixeiro Viajante com Prazos para a instância: Instancias\000_teste.txt
+Melhor custo encontrado: 76
+Melhor rota: [0, 2, 4, 1, 3]
+
+
+Resolução do Caixeiro Viajante com Prazos para a instância: Instancias\01_n20_001.txt
